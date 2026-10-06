@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search> 
+  
+  
+    
+    <entry>
+      <title>你好，世界</title>
+      <link href="/blog/hello-world/"/>
+      <url>/blog/hello-world/</url>
+      
+        <content type="html"><![CDATA[<p>欢迎来到 <strong>Leo’s Blog</strong>！</p><p>这是博客升级后的第一篇文章。本站基于 Hexo 7 + Butterfly 5 主题搭建，支持：</p><ul><li>本地文章搜索</li><li>深色 &#x2F; 浅色模式切换</li><li>阅读模式</li><li>文章目录导航</li><li>字数统计与阅读时长</li><li>动态彩带背景</li><li>鼠标点击爱心特效</li><li>Live2D 看板娘</li></ul><h2 id="关于我"><a href="#关于我" class="headerlink" title="关于我"></a>关于我</h2><p>我是 Leo，一名热爱编程与技术的学生。这里会记录我的学习笔记、项目实践和生活感悟。</p><blockquote><p>走好选择的路，别走选择好的路。</p></blockquote><h2 id="如何写新文章"><a href="#如何写新文章" class="headerlink" title="如何写新文章"></a>如何写新文章</h2><p>在项目目录下执行：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx hexo new <span class="string">&quot;文章标题&quot;</span></span><br></pre></td></tr></table></figure><p>然后编辑 <code>source/_posts/文章标题.md</code> 即可。</p><hr><p>感谢访问，祝阅读愉快！</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 随笔 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 随笔 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+  
+  
+</search>
