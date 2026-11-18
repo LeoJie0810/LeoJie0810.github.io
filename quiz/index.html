@@ -72,6 +72,8 @@ header{display:flex;align-items:flex-start;justify-content:space-between;gap:16p
   padding:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;box-shadow:var(--shadow);
 }
 .toolbar label{font-size:13px;color:var(--sub);margin-right:-4px}
+.kh-tip{margin-left:auto;font-size:12.5px;color:var(--sub)}
+.kh-tip b{color:var(--accent);font-weight:700}
 select{
   font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--card);
   border:1px solid var(--line);border-radius:9px;padding:8px 10px;cursor:pointer;outline:none;max-width:230px;
@@ -164,9 +166,21 @@ select:focus{border-color:var(--accent)}
 
 .kh-list{display:flex;flex-direction:column;gap:16px;margin-top:18px}
 .kh-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:var(--shadow)}
-.kh-card h3{margin:0 0 14px;font-size:16px;color:var(--accent);letter-spacing:.3px}
-.kh-card ol{margin:0;padding-left:0;list-style:none}
-.kh-card li{font-size:14.5px;line-height:1.9;color:var(--ink);margin-bottom:2px;text-indent:-2px}
+.kh-card h3{margin:0 0 16px;font-size:16px;color:var(--accent);letter-spacing:.3px;line-height:1.5}
+.kh-sec + .kh-sec{margin-top:22px;padding-top:18px;border-top:1px dashed var(--line)}
+.sec-tag{display:inline-block;font-size:11.5px;padding:4px 10px;border-radius:6px;margin-bottom:12px;letter-spacing:.4px;font-weight:600}
+.sec-tag.obj{background:var(--accent-soft);color:var(--accent)}
+.sec-tag.subj{background:var(--ok-soft);color:var(--ok)}
+.kh-item{margin-bottom:14px}
+.kh-item:last-child{margin-bottom:0}
+.kh-item b{display:block;font-size:14.5px;line-height:1.6;margin-bottom:4px}
+.kh-item p{margin:0;font-size:13.8px;line-height:1.85;color:var(--sub)}
+.subj-item{border-left:3px solid var(--line);padding-left:14px;margin-bottom:18px}
+.subj-item:last-child{margin-bottom:0}
+.subj-q{font-size:14.5px;font-weight:600;line-height:1.6;margin-bottom:8px}
+.subj-q .pg{font-size:11.5px;font-weight:400;color:var(--sub);margin-left:8px}
+.subj-item ol{margin:0;padding-left:20px;list-style:decimal}
+.subj-item li{font-size:13.5px;line-height:1.85;color:var(--sub);margin-bottom:3px}
 
 footer{text-align:center;color:var(--sub);font-size:12px;margin-top:34px;letter-spacing:.3px;line-height:1.8}
 footer a{color:var(--sub)}
@@ -229,6 +243,15 @@ footer a{color:var(--sub)}
   </section>
 
   <section class="panel" id="panel-knowledge">
+    <div class="toolbar kh-toolbar">
+      <label for="khTypeSel">题型分类</label>
+      <select id="khTypeSel">
+        <option value="all">全部考点</option>
+        <option value="objective">客观题考点（选择）</option>
+        <option value="subjective">主观题考点（简答/论述）</option>
+      </select>
+      <span class="kh-tip">共 <b id="khCount">—</b> 条考点</span>
+    </div>
     <div class="kh-list" id="khList"></div>
   </section>
 
@@ -272,6 +295,8 @@ footer a{color:var(--sub)}
     startBtn: document.getElementById("startBtn"),
     qArea: document.getElementById("qArea"),
     khList: document.getElementById("khList"),
+    khTypeSel: document.getElementById("khTypeSel"),
+    khCount: document.getElementById("khCount"),
     stProgress: document.getElementById("stProgress"),
     stAnswered: document.getElementById("stAnswered"),
     stCorrect: document.getElementById("stCorrect"),
@@ -355,6 +380,8 @@ footer a{color:var(--sub)}
 
     renderKnowledge();
 
+    if (el.khTypeSel) el.khTypeSel.addEventListener("change", renderKnowledge);
+
     el.chSel.addEventListener("change", function(){
       var o = el.chSel.querySelector('option[value="__wrong__"]');
       if (o) o.textContent = "只刷错题本（" + wrongSet.size + "）";
@@ -368,19 +395,44 @@ footer a{color:var(--sub)}
 
   /* ---------- 知识点 ---------- */
   function renderKnowledge(){
-    var html = "";
+    var filter = el.khTypeSel ? el.khTypeSel.value : "all";
+    var html = "", count = 0;
     CHAPTERS.forEach(function(ch){
-      html += '<div class="kh-card"><h3>' + ch.name + '</h3>';
-      if (ch.knowledge && ch.knowledge.length){
-        html += '<ol>';
-        ch.knowledge.forEach(function(k){ html += '<li>' + escapeHtml(k) + '</li>'; });
-        html += '</ol>';
-      } else {
-        html += '<p style="color:var(--sub);font-size:14px;margin:0">本章暂无知识点条目</p>';
+      var kh = ch.knowledge || {};
+      var obj = (kh.objective || []).slice();
+      var subj = (kh.subjective || []).slice();
+      if (filter === "objective") subj = [];
+      if (filter === "subjective") obj = [];
+      if (!obj.length && !subj.length) return;
+      count += obj.length + subj.length;
+
+      html += '<div class="kh-card"><h3>' + escapeHtml(ch.name) + '</h3>';
+
+      if (obj.length){
+        html += '<div class="kh-sec"><div class="sec-tag obj">客观题考点</div>';
+        obj.forEach(function(item){
+          html += '<div class="kh-item"><b>' + escapeHtml(item.t) + '</b><p>' + escapeHtml(item.c) + '</p></div>';
+        });
+        html += '</div>';
       }
+
+      if (subj.length){
+        html += '<div class="kh-sec"><div class="sec-tag subj">主观题考点 · 简答/论述</div>';
+        subj.forEach(function(item){
+          html += '<div class="subj-item"><div class="subj-q">' + escapeHtml(item.q)
+               + (item.page ? '<span class="pg">教材 ' + escapeHtml(item.page) + '</span>' : '')
+               + '</div><ol>';
+          (item.p || []).forEach(function(pt){ html += '<li>' + escapeHtml(pt) + '</li>'; });
+          html += '</ol></div>';
+        });
+        html += '</div>';
+      }
+
       html += '</div>';
     });
-    el.khList.innerHTML = html;
+
+    if (el.khCount) el.khCount.textContent = count;
+    el.khList.innerHTML = html || '<div class="kh-card"><p style="color:var(--sub);font-size:14px;margin:0">暂无内容</p></div>';
   }
 
   function escapeHtml(s){
