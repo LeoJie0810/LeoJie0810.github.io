@@ -408,8 +408,25 @@ html[data-theme="dark"] .hero-mask{
   .post-item-link{padding:20px}
   .pi-title{font-size:16.5px}
 }
+@media (max-width:768px){
+  .hero{min-height:auto;padding:calc(var(--nav-h) + 24px) 18px 48px}
+  .hero-eyebrow{margin-bottom:12px}
+  .hero-sub{margin-top:16px;min-height:26px}
+  .hero-actions{margin-top:26px;gap:10px}
+  .hero-actions .btn{height:42px;padding:0 20px;font-size:14px}
+  .hero-scroll{display:none}
+  .card-grid{margin-top:-16px;gap:12px}
+  .section-head{margin:36px 0 16px}
+  .section-head h2{font-size:19px}
+  #live2d-widget{display:none!important}
+  .aplayer.aplayer-fixed{right:12px!important;bottom:12px!important}
+  .to-top{right:12px;bottom:82px}
+  .post-item-link{padding:18px 18px}
+  .pi-excerpt{-webkit-line-clamp:2}
+}
+
 @media (max-width:600px){
-  .hero{min-height:74vh}
+  .hero{min-height:auto;padding:calc(var(--nav-h) + 20px) 16px 42px}
   .hero-eyebrow{font-size:10px;letter-spacing:.24em}
   .card-grid{grid-template-columns:1fr 1fr;gap:12px}
   .feature-card{padding:18px 16px}
@@ -418,8 +435,8 @@ html[data-theme="dark"] .hero-mask{
   .post-page{padding-top:calc(var(--nav-h) + 26px)}
   .post-nav{grid-template-columns:1fr}
   .pager{gap:10px}
-  .to-top{right:14px;bottom:88px}
-  .aplayer.aplayer-fixed{max-width:calc(100vw - 28px);right:14px!important}
+  .to-top{right:12px;bottom:84px}
+  .aplayer.aplayer-fixed{max-width:70px;right:10px!important;bottom:10px!important}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
