@@ -29,7 +29,12 @@
 
   function onScroll() {
     var y = window.pageYOffset || document.documentElement.scrollTop;
-    if (nav) nav.classList.toggle('scrolled', y > 8);
+    if (nav) {
+      var heroEl = document.querySelector('.hero');
+      var threshold = 8;
+      if (heroEl) threshold = Math.max(8, heroEl.offsetHeight - (nav.offsetHeight || 66) - 24);
+      nav.classList.toggle('scrolled', y > threshold);
+    }
     if (toTop) toTop.classList.toggle('show', y > 400);
     if (progress) {
       var h = document.documentElement.scrollHeight - window.innerHeight;

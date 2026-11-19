@@ -75,6 +75,22 @@ button{font-family:inherit}
   transition:border-color .25s ease,box-shadow .25s ease,background .25s ease;
 }
 .nav.scrolled{border-bottom-color:var(--line);box-shadow:0 6px 24px rgba(0,0,0,.06)}
+
+/* 首页：导航浮在 Hero 上时透明，与背景融合；滚过 Hero 再变成毛玻璃 */
+body.is-home .nav:not(.scrolled){
+  background:linear-gradient(180deg,rgba(6,14,30,.46) 0%,rgba(6,14,30,.16) 62%,rgba(6,14,30,0) 100%);
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  border-bottom-color:transparent;
+  box-shadow:none;
+}
+body.is-home .nav:not(.scrolled) .brand-name{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.35)}
+body.is-home .nav:not(.scrolled) .menu-item{color:rgba(255,255,255,.86)}
+body.is-home .nav:not(.scrolled) .menu-item:hover{background:rgba(255,255,255,.16);color:#fff}
+body.is-home .nav:not(.scrolled) .menu-item.active{color:#fff;background:rgba(255,255,255,.22)}
+body.is-home .nav:not(.scrolled) .icon-btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.26);color:#fff}
+body.is-home .nav:not(.scrolled) .icon-btn:hover{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.5);color:#fff}
+body.is-home .nav:not(.scrolled) .brand-avatar{border-color:rgba(255,255,255,.45)}
 .nav-inner{
   max-width:1120px;height:100%;margin:0 auto;padding:0 22px;
   display:flex;align-items:center;gap:20px;
@@ -400,6 +416,9 @@ html[data-theme="dark"] .hero-mask{
     background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);
     box-shadow:var(--shadow-lg);margin:0}
   .menu.open{display:flex}
+  body.is-home .nav:not(.scrolled) .menu .menu-item{color:var(--sub)}
+  body.is-home .nav:not(.scrolled) .menu .menu-item:hover{background:var(--surface-2);color:var(--ink)}
+  body.is-home .nav:not(.scrolled) .menu .menu-item.active{color:var(--accent);background:var(--accent-soft)}
   .menu-item{padding:11px 14px;border-radius:10px}
   .menu-toggle{display:grid}
   .nav-actions{margin-left:auto}
