@@ -153,6 +153,10 @@ select:focus{border-color:var(--accent)}
 .feedback .fb-body{color:var(--ink);white-space:pre-wrap}
 .feedback .fb-ans{color:var(--sub);margin-top:6px;font-size:13.5px}
 .feedback .fb-ans b{color:var(--accent)}
+.fb-analysis{margin-top:12px;padding:11px 13px;border-radius:9px;background:rgba(255,255,255,.5);border-left:3px solid var(--accent);font-size:13.5px;line-height:1.85;color:var(--ink)}
+.feedback.err .fb-analysis{border-left-color:var(--err)}
+.fb-lab{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--accent);margin-right:6px;vertical-align:1px}
+.feedback.err .fb-lab{color:var(--err)}
 
 .done{
   background:var(--card);border:1px solid var(--line);border-radius:18px;padding:40px 26px;
@@ -626,7 +630,8 @@ footer a{color:var(--sub)}
     fb.innerHTML = '<div class="fb-title">' + (isCorrect ? "回答正确" : "回答错误") + '</div>' +
       '<div class="fb-ans">正确答案：<b>' + q.answer + '</b>' +
       (state.selected.length ? '　你选择了：' + state.selected.slice().sort().join("") : "") +
-      '</div>';
+      '</div>' +
+      (q.analysis ? '<div class="fb-analysis"><span class="fb-lab">解析</span>' + escapeHtml(q.analysis) + '</div>' : '');
 
     // 动作区替换
     var actions = document.querySelector(".actions");
@@ -646,7 +651,8 @@ footer a{color:var(--sub)}
     var fb = document.getElementById("feedback");
     fb.className = "feedback show ok";
     fb.innerHTML = '<div class="fb-title">参考答案</div>' +
-      '<div class="fb-body">' + escapeHtml(q.answer || "暂无参考答案") + '</div>';
+      '<div class="fb-body">' + escapeHtml(q.answer || "暂无参考答案") + '</div>' +
+      (q.analysis ? '<div class="fb-analysis"><span class="fb-lab">答题思路</span>' + escapeHtml(q.analysis) + '</div>' : '');
 
     var actions = document.querySelector(".actions");
     actions.innerHTML = '<span class="kbdhint">按 Enter 进入下一题</span><span class="spacer"></span>' +
