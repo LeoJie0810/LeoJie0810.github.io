@@ -144,6 +144,8 @@ select:focus{border-color:var(--accent)}
 .qnav .btn{padding:7px 14px;font-size:13px}
 .qnav .btn:disabled{opacity:.4;cursor:not-allowed}
 .navpos{font-size:12.5px;color:var(--sub);letter-spacing:.3px}
+.resume-tip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--ink);margin-bottom:14px;line-height:1.6}
+.resume-tip .btn{margin-left:auto;padding:6px 12px;font-size:12.5px}
 .spacer{flex:1}
 .btn{
   font-family:inherit;font-size:14px;padding:10px 22px;border-radius:10px;cursor:pointer;
@@ -287,6 +289,7 @@ footer a{color:var(--sub)}
 
   var LS_WRONG = "mg_wrong_v1";
   var LS_THEME = "mg_theme_v1";
+  var LS_SESSION = "mg_session_v1";
 
   var wrongSet = new Set();
   try {
@@ -302,7 +305,8 @@ footer a{color:var(--sub)}
     selected: [],
     locked: false,
     revealed: false,
-    log: {}
+    log: {},
+    resumed: false
   };
 
   var el = {
@@ -370,6 +374,62 @@ footer a{color:var(--sub)}
     return a.split("").sort().join("");
   }
 
+  /* ---------- 进度持久化 ---------- */
+  var saveTimer = null;
+
+  function saveSession(immediate){
+    var write = function(){
+      try {
+        localStorage.setItem(LS_SESSION, JSON.stringify({
+          v: 1,
+          queue: state.queue.map(function(q){ return q.id; }),
+          idx: state.idx,
+          answered: state.answered,
+          correct: state.correct,
+          log: state.log,
+          done: !!(state.queue.length && state.idx >= state.queue.length)
+        }));
+      } catch(e){}
+    };
+    if (immediate){ if (saveTimer){ clearTimeout(saveTimer); saveTimer = null; } write(); return; }
+    if (saveTimer) return;
+    saveTimer = setTimeout(function(){ saveTimer = null; write(); }, 200);
+  }
+
+  function clearSession(){
+    try { localStorage.removeItem(LS_SESSION); } catch(e){}
+  }
+
+  function restoreSession(){
+    var raw = null;
+    try { raw = localStorage.getItem(LS_SESSION); } catch(e){}
+    if (!raw) return false;
+
+    var s = null;
+    try { s = JSON.parse(raw); } catch(e){ return false; }
+    if (!s || !Array.isArray(s.queue) || !s.queue.length || s.done) return false;
+
+    var map = {};
+    allQuestions().forEach(function(q){ map[q.id] = q; });
+    var queue = [];
+    for (var i = 0; i < s.queue.length; i++){
+      var q = map[s.queue[i]];
+      if (!q) return false;
+      queue.push(q);
+    }
+
+    state.queue = queue;
+    state.idx = Math.min(Math.max(0, parseInt(s.idx, 10) || 0), queue.length - 1);
+    state.answered = parseInt(s.answered, 10) || 0;
+    state.correct = parseInt(s.correct, 10) || 0;
+    state.log = (s.log && typeof s.log === "object") ? s.log : {};
+    state.resumed = true;
+
+    renderQuestion();
+    updateStats();
+    return true;
+  }
+
   /* ---------- 数据加载 ---------- */
   function loadData(){
     fetch("./quiz_data.json", {cache: "no-cache"})
@@ -410,7 +470,7 @@ footer a{color:var(--sub)}
     if (el.typeChk) el.typeChk.addEventListener("change", syncTypeChk);
     syncTypeChk();
 
-    start();
+    if (!restoreSession()) start();
   }
 
   function selectedTypes(){
@@ -516,6 +576,7 @@ footer a{color:var(--sub)}
     state.answered = 0;
     state.correct = 0;
     state.log = {};
+    state.resumed = false;
 
     if (!pool.length){
       el.qArea.innerHTML = '<div class="done"><h2>没有可刷的题目</h2><p>换个筛选条件，或先去做几道题积累错题。</p></div>';
@@ -524,6 +585,7 @@ footer a{color:var(--sub)}
     }
     renderQuestion();
     updateStats();
+    saveSession(true);
   }
 
   /* ---------- 渲染 ---------- */
@@ -552,7 +614,14 @@ footer a{color:var(--sub)}
     var chName = ch ? ch.name : q.chapter;
     var ansNorm = normalize(q.answer || "");
 
-    var html = '<div class="qcard">';
+    var html = '';
+    if (state.resumed){
+      html += '<div class="resume-tip">已恢复上次进度 · 第 ' + (state.idx + 1) + ' / ' + state.queue.length +
+              ' 题，已答 ' + state.answered + ' 题' +
+              '<button class="btn" id="freshBtn">重新开始</button></div>';
+      state.resumed = false;
+    }
+    html += '<div class="qcard">';
     html += '<div class="qmeta">';
     html += '<span class="badge type">' + QTYPE_LABEL[q.type] + '</span>';
     html += '<span class="badge ch">' + escapeHtml(chName) + '</span>';
@@ -620,6 +689,9 @@ footer a{color:var(--sub)}
 
     var skipBtn = document.getElementById("skipBtn");
     if (skipBtn) skipBtn.addEventListener("click", next);
+
+    var freshBtn = document.getElementById("freshBtn");
+    if (freshBtn) freshBtn.addEventListener("click", function(){ clearSession(); start(); });
 
     document.getElementById("prevBtn").addEventListener("click", prev);
     document.getElementById("navNextBtn").addEventListener("click", next);
@@ -734,6 +806,7 @@ footer a{color:var(--sub)}
 
     updateNav();
     updateStats();
+    saveSession(true);
   }
 
   function revealAnswer(){
@@ -751,6 +824,7 @@ footer a{color:var(--sub)}
     actions.innerHTML = '<span class="kbdhint">按 Enter 进入下一题</span><span class="spacer"></span>';
 
     updateNav();
+    saveSession(true);
   }
 
   function prev(){
@@ -758,12 +832,14 @@ footer a{color:var(--sub)}
     state.idx--;
     renderQuestion();
     updateStats();
+    saveSession(true);
   }
 
   function next(){
     state.idx++;
     if (state.idx >= state.queue.length){ renderDone(); updateStats(); return; }
     renderQuestion();
+    saveSession(true);
   }
 
   function renderDone(){
@@ -777,6 +853,7 @@ footer a{color:var(--sub)}
       '<button class="btn primary" id="againBtn">重新开始</button></div></div>';
     document.getElementById("againBtn").addEventListener("click", start);
     el.bar.style.width = "100%";
+    saveSession(true);
   }
 
   /* ---------- 键盘 ---------- */
