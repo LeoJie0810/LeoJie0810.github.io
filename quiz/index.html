@@ -72,6 +72,13 @@ header{display:flex;align-items:flex-start;justify-content:space-between;gap:16p
   padding:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;box-shadow:var(--shadow);
 }
 .toolbar label{font-size:13px;color:var(--sub);margin-right:-4px}
+.flabel{font-size:13px;color:var(--sub);margin-right:-4px}
+.chk-group{display:flex;gap:6px;align-items:center}
+.chk{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:13px;color:var(--sub);background:var(--card);transition:.15s;user-select:none}
+.chk input{display:none}
+.chk i{font-style:normal}
+.chk.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600}
+.typehint{font-size:12px;color:var(--err)}
 .kh-tip{margin-left:auto;font-size:12.5px;color:var(--sub)}
 .kh-tip b{color:var(--accent);font-weight:700}
 select{
@@ -84,6 +91,7 @@ select:focus{border-color:var(--accent)}
   padding:9px 20px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s;
 }
 .startbtn:hover{filter:brightness(.94)}
+.startbtn:disabled{opacity:.45;cursor:not-allowed}
 
 .stats{display:flex;gap:0;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-top:12px;overflow:hidden;box-shadow:var(--shadow)}
 .stat{flex:1;padding:12px 14px;text-align:center;border-right:1px solid var(--line)}
@@ -132,6 +140,10 @@ select:focus{border-color:var(--accent)}
 .opt.locked{cursor:default}
 
 .actions{display:flex;gap:10px;align-items:center;margin-top:22px;flex-wrap:wrap}
+.qnav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.qnav .btn{padding:7px 14px;font-size:13px}
+.qnav .btn:disabled{opacity:.4;cursor:not-allowed}
+.navpos{font-size:12.5px;color:var(--sub);letter-spacing:.3px}
 .spacer{flex:1}
 .btn{
   font-family:inherit;font-size:14px;padding:10px 22px;border-radius:10px;cursor:pointer;
@@ -219,13 +231,13 @@ footer a{color:var(--sub)}
     <div class="toolbar">
       <label for="chSel">章节</label>
       <select id="chSel"></select>
-      <label for="typeSel">题型</label>
-      <select id="typeSel">
-        <option value="all">全部题型</option>
-        <option value="single">单选题</option>
-        <option value="multiple">多选题</option>
-        <option value="short">简答题</option>
-      </select>
+      <span class="flabel">题型</span>
+      <div class="chk-group" id="typeChk">
+        <label class="chk"><input type="checkbox" value="single" checked><i>单选</i></label>
+        <label class="chk"><input type="checkbox" value="multiple" checked><i>多选</i></label>
+        <label class="chk"><input type="checkbox" value="short" checked><i>简答</i></label>
+      </div>
+      <span class="typehint" id="typeHint"></span>
       <label for="orderSel">顺序</label>
       <select id="orderSel">
         <option value="random">随机</option>
@@ -289,12 +301,13 @@ footer a{color:var(--sub)}
     correct: 0,
     selected: [],
     locked: false,
-    revealed: false
+    revealed: false,
+    log: {}
   };
 
   var el = {
     chSel: document.getElementById("chSel"),
-    typeSel: document.getElementById("typeSel"),
+    typeChk: document.getElementById("typeChk"),
     orderSel: document.getElementById("orderSel"),
     startBtn: document.getElementById("startBtn"),
     qArea: document.getElementById("qArea"),
@@ -394,7 +407,29 @@ footer a{color:var(--sub)}
     el.startBtn.addEventListener("click", start);
     document.addEventListener("keydown", onKey);
 
+    if (el.typeChk) el.typeChk.addEventListener("change", syncTypeChk);
+    syncTypeChk();
+
     start();
+  }
+
+  function selectedTypes(){
+    if (!el.typeChk) return ["single", "multiple", "short"];
+    return Array.prototype.slice.call(el.typeChk.querySelectorAll("input:checked"))
+      .map(function(i){ return i.value; });
+  }
+
+  function syncTypeChk(){
+    if (!el.typeChk) return;
+    el.typeChk.querySelectorAll("label.chk").forEach(function(l){
+      var inp = l.querySelector("input");
+      if (inp) l.classList.toggle("on", inp.checked);
+    });
+    var empty = selectedTypes().length === 0;
+    el.startBtn.disabled = empty;
+    el.startBtn.title = empty ? "至少勾选一种题型" : "";
+    var hint = document.getElementById("typeHint");
+    if (hint) hint.textContent = empty ? "请至少勾选一种题型" : "";
   }
 
   /* ---------- 知识点 ---------- */
@@ -446,8 +481,13 @@ footer a{color:var(--sub)}
   /* ---------- 开始 ---------- */
   function start(){
     var chVal = el.chSel.value;
-    var typeVal = el.typeSel.value;
+    var types = selectedTypes();
     var order = el.orderSel.value;
+
+    if (!types.length){
+      el.qArea.innerHTML = '<div class="empty">请至少勾选一种题型再开始</div>';
+      return;
+    }
 
     var pool = [];
     if (chVal === "__wrong__"){
@@ -460,8 +500,8 @@ footer a{color:var(--sub)}
       if (ch) pool = ch.questions.slice();
     }
 
-    if (typeVal !== "all"){
-      pool = pool.filter(function(q){ return q.type === typeVal; });
+    if (types.length < 3){
+      pool = pool.filter(function(q){ return types.indexOf(q.type) >= 0; });
     }
 
     if (order === "random"){
@@ -475,6 +515,7 @@ footer a{color:var(--sub)}
     state.idx = 0;
     state.answered = 0;
     state.correct = 0;
+    state.log = {};
 
     if (!pool.length){
       el.qArea.innerHTML = '<div class="done"><h2>没有可刷的题目</h2><p>换个筛选条件，或先去做几道题积累错题。</p></div>';
@@ -502,12 +543,14 @@ footer a{color:var(--sub)}
     var q = currentQ();
     if (!q){ renderDone(); updateStats(); return; }
 
-    state.selected = [];
-    state.locked = false;
-    state.revealed = false;
+    var rec = state.log[q.id] || null;
+    state.selected = rec ? (rec.selected || []).slice() : [];
+    state.locked = !!rec;
+    state.revealed = !!(rec && rec.revealed);
 
     var ch = findChapter(q.chapter);
     var chName = ch ? ch.name : q.chapter;
+    var ansNorm = normalize(q.answer || "");
 
     var html = '<div class="qcard">';
     html += '<div class="qmeta">';
@@ -516,13 +559,21 @@ footer a{color:var(--sub)}
     html += '<span class="badge idx">' + (state.idx + 1) + " / " + state.queue.length + '</span>';
     html += '</div>';
     html += '<div class="stem">' + escapeHtml(q.stem);
-    if (q.type === "multiple") html += '<span class="hint">多选题：选出所有正确选项后点击「提交答案」</span>';
+    if (q.type === "multiple" && !rec) html += '<span class="hint">多选题：选出所有正确选项后点击「提交答案」</span>';
     html += '</div>';
 
     if (q.type !== "short"){
       html += '<div class="opts" id="opts">';
       q.options.forEach(function(o){
-        html += '<button class="opt" data-key="' + o.key + '">' +
+        var cls = "opt";
+        if (rec){
+          cls += " locked";
+          if (ansNorm.indexOf(o.key) >= 0) cls += " correct";
+          else if (state.selected.indexOf(o.key) >= 0) cls += " wrong";
+        } else if (state.selected.indexOf(o.key) >= 0){
+          cls += " selected";
+        }
+        html += '<button class="' + cls + '" data-key="' + o.key + '">' +
                 '<span class="k">' + o.key + '</span>' +
                 '<span class="t">' + escapeHtml(o.text) + '</span></button>';
       });
@@ -530,7 +581,9 @@ footer a{color:var(--sub)}
     }
 
     html += '<div class="actions">';
-    if (q.type === "short"){
+    if (rec){
+      html += '<span class="kbdhint">按 Enter 进入下一题</span>';
+    } else if (q.type === "short"){
       html += '<button class="btn primary" id="revealBtn">显示参考答案</button>';
     } else if (q.type === "multiple"){
       html += '<button class="btn primary" id="submitBtn" disabled>提交答案</button>';
@@ -538,9 +591,16 @@ footer a{color:var(--sub)}
       html += '<span class="kbdhint">键盘 1–4 可快速选择</span>';
     }
     html += '<span class="spacer"></span>';
-    html += '<button class="btn" id="skipBtn">跳过</button>';
+    if (!rec) html += '<button class="btn" id="skipBtn">跳过</button>';
     html += '</div>';
     html += '<div class="feedback" id="feedback"></div>';
+
+    html += '<div class="qnav">';
+    html += '<button class="btn navbtn" id="prevBtn"' + (state.idx > 0 ? '' : ' disabled') + '>← 上一题</button>';
+    html += '<span class="navpos">第 ' + (state.idx + 1) + ' / ' + state.queue.length + ' 题</span>';
+    html += '<button class="btn navbtn" id="navNextBtn"' + (state.locked ? '' : ' disabled') + '>下一题 →</button>';
+    html += '</div>';
+
     html += '</div>';
 
     el.qArea.innerHTML = html;
@@ -558,9 +618,47 @@ footer a{color:var(--sub)}
     var revealBtn = document.getElementById("revealBtn");
     if (revealBtn) revealBtn.addEventListener("click", revealAnswer);
 
-    document.getElementById("skipBtn").addEventListener("click", next);
+    var skipBtn = document.getElementById("skipBtn");
+    if (skipBtn) skipBtn.addEventListener("click", next);
 
+    document.getElementById("prevBtn").addEventListener("click", prev);
+    document.getElementById("navNextBtn").addEventListener("click", next);
+
+    if (rec) renderFeedback(q, rec);
+
+    updateNav();
     updateStats();
+  }
+
+  function updateNav(){
+    var p = document.getElementById("prevBtn");
+    var n = document.getElementById("navNextBtn");
+    if (p) p.disabled = state.idx <= 0;
+    if (n) n.disabled = !state.locked;
+  }
+
+  function renderFeedback(q, rec){
+    var fb = document.getElementById("feedback");
+    if (!fb) return;
+    if (q.type === "short" && rec.revealed){
+      fb.className = "feedback show ok";
+      fb.innerHTML = '<div class="fb-title">参考答案</div>' +
+        '<div class="fb-body">' + escapeHtml(q.answer || "暂无参考答案") + '</div>' +
+        analysisBlock(q, "答题思路");
+      return;
+    }
+    var isCorrect = !!rec.correct;
+    fb.className = "feedback show " + (isCorrect ? "ok" : "err");
+    fb.innerHTML = '<div class="fb-title">' + (isCorrect ? "回答正确" : "回答错误") + '</div>' +
+      '<div class="fb-ans">正确答案：<b>' + q.answer + '</b>' +
+      (rec.selected && rec.selected.length ? '　你选择了：' + rec.selected.slice().sort().join("") : "") +
+      '</div>' +
+      analysisBlock(q, "解析");
+  }
+
+  function analysisBlock(q, lab){
+    if (!q.analysis) return "";
+    return '<div class="fb-analysis"><span class="fb-lab">' + (lab || "解析") + '</span>' + escapeHtml(q.analysis) + '</div>';
   }
 
   /* ---------- 作答 ---------- */
@@ -624,21 +722,17 @@ footer a{color:var(--sub)}
       saveWrong();
     }
 
-    // 反馈
-    var fb = document.getElementById("feedback");
-    fb.className = "feedback show " + (isCorrect ? "ok" : "err");
-    fb.innerHTML = '<div class="fb-title">' + (isCorrect ? "回答正确" : "回答错误") + '</div>' +
-      '<div class="fb-ans">正确答案：<b>' + q.answer + '</b>' +
-      (state.selected.length ? '　你选择了：' + state.selected.slice().sort().join("") : "") +
-      '</div>' +
-      (q.analysis ? '<div class="fb-analysis"><span class="fb-lab">解析</span>' + escapeHtml(q.analysis) + '</div>' : '');
+    // 记录作答，回看时还原
+    var rec = {selected: state.selected.slice(), locked: true, correct: isCorrect};
+    state.log[q.id] = rec;
+
+    renderFeedback(q, rec);
 
     // 动作区替换
     var actions = document.querySelector(".actions");
-    actions.innerHTML = '<span class="kbdhint">按 Enter 进入下一题</span><span class="spacer"></span>' +
-      '<button class="btn primary" id="nextBtn">下一题</button>';
-    document.getElementById("nextBtn").addEventListener("click", next);
+    actions.innerHTML = '<span class="kbdhint">按 Enter 进入下一题</span><span class="spacer"></span>';
 
+    updateNav();
     updateStats();
   }
 
@@ -648,16 +742,22 @@ footer a{color:var(--sub)}
     state.revealed = true;
     state.locked = true;
 
-    var fb = document.getElementById("feedback");
-    fb.className = "feedback show ok";
-    fb.innerHTML = '<div class="fb-title">参考答案</div>' +
-      '<div class="fb-body">' + escapeHtml(q.answer || "暂无参考答案") + '</div>' +
-      (q.analysis ? '<div class="fb-analysis"><span class="fb-lab">答题思路</span>' + escapeHtml(q.analysis) + '</div>' : '');
+    var rec = {selected: [], locked: true, revealed: true};
+    state.log[q.id] = rec;
+
+    renderFeedback(q, rec);
 
     var actions = document.querySelector(".actions");
-    actions.innerHTML = '<span class="kbdhint">按 Enter 进入下一题</span><span class="spacer"></span>' +
-      '<button class="btn primary" id="nextBtn">下一题</button>';
-    document.getElementById("nextBtn").addEventListener("click", next);
+    actions.innerHTML = '<span class="kbdhint">按 Enter 进入下一题</span><span class="spacer"></span>';
+
+    updateNav();
+  }
+
+  function prev(){
+    if (state.idx <= 0) return;
+    state.idx--;
+    renderQuestion();
+    updateStats();
   }
 
   function next(){
@@ -688,6 +788,10 @@ footer a{color:var(--sub)}
 
     if (key === "Enter" && state.locked){
       next();
+      return;
+    }
+    if (key === "ArrowLeft"){
+      prev();
       return;
     }
     if (!state.locked && q.type !== "short" && /^[1-4]$/.test(key)){
