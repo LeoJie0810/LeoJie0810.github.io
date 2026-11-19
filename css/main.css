@@ -383,9 +383,9 @@ html[data-theme="dark"] .hero-mask{
 .to-top:hover{color:var(--accent);border-color:var(--accent)}
 
 /* 音乐播放器位置：左下 */
-.aplayer.aplayer-fixed{left:18px!important;right:auto!important;bottom:16px!important;max-width:330px}
-.aplayer.aplayer-fixed .aplayer-body{left:18px!important;right:auto!important;bottom:16px!important}
-.aplayer.aplayer-fixed.aplayer-narrow .aplayer-body{left:18px!important;right:auto!important}
+.aplayer.aplayer-fixed{left:18px!important;right:auto!important;bottom:16px!important;width:330px!important;max-width:330px!important}
+.aplayer.aplayer-fixed .aplayer-body{left:18px!important;right:auto!important;bottom:16px!important;width:330px!important;max-width:330px!important}
+.aplayer.aplayer-fixed.aplayer-narrow .aplayer-body{left:18px!important;right:auto!important;width:66px!important;max-width:66px!important}
 .aplayer.aplayer-fixed .aplayer-body{box-shadow:0 12px 34px rgba(0,0,0,.28)!important;border-radius:12px!important}
 .aplayer.aplayer-fixed .aplayer-miniswitcher{border-radius:0 12px 12px 0!important}
 
