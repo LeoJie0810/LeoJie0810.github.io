@@ -382,10 +382,10 @@ html[data-theme="dark"] .hero-mask{
 .to-top.show{opacity:1;visibility:visible;transform:none}
 .to-top:hover{color:var(--accent);border-color:var(--accent)}
 
-/* 音乐播放器位置：右下，避开左下看板娘 */
-.aplayer.aplayer-fixed{left:auto!important;right:18px!important;bottom:16px!important;max-width:330px}
-.aplayer.aplayer-fixed .aplayer-body{left:auto!important;right:18px!important;bottom:16px!important}
-.aplayer.aplayer-fixed.aplayer-narrow .aplayer-body{right:18px!important;left:auto!important}
+/* 音乐播放器位置：左下 */
+.aplayer.aplayer-fixed{left:18px!important;right:auto!important;bottom:16px!important;max-width:330px}
+.aplayer.aplayer-fixed .aplayer-body{left:18px!important;right:auto!important;bottom:16px!important}
+.aplayer.aplayer-fixed.aplayer-narrow .aplayer-body{left:18px!important;right:auto!important}
 .aplayer.aplayer-fixed .aplayer-body{box-shadow:0 12px 34px rgba(0,0,0,.28)!important;border-radius:12px!important}
 .aplayer.aplayer-fixed .aplayer-miniswitcher{border-radius:0 12px 12px 0!important}
 
@@ -419,7 +419,7 @@ html[data-theme="dark"] .hero-mask{
   .section-head{margin:36px 0 16px}
   .section-head h2{font-size:19px}
   #live2d-widget{display:none!important}
-  .aplayer.aplayer-fixed{right:12px!important;bottom:12px!important}
+  .aplayer.aplayer-fixed{left:12px!important;right:auto!important;bottom:12px!important}
   .to-top{right:12px;bottom:82px}
   .post-item-link{padding:18px 18px}
   .pi-excerpt{-webkit-line-clamp:2}
@@ -436,7 +436,7 @@ html[data-theme="dark"] .hero-mask{
   .post-nav{grid-template-columns:1fr}
   .pager{gap:10px}
   .to-top{right:12px;bottom:84px}
-  .aplayer.aplayer-fixed{max-width:70px;right:10px!important;bottom:10px!important}
+  .aplayer.aplayer-fixed{max-width:70px;left:10px!important;right:auto!important;bottom:10px!important}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
