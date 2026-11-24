@@ -56,6 +56,26 @@ header{display:flex;align-items:flex-start;justify-content:space-between;gap:16p
   padding:8px 12px;border-radius:9px;font-size:12.5px;cursor:pointer;transition:.18s;
 }
 .themebtn:hover{color:var(--ink);border-color:var(--accent)}
+.head-actions{display:flex;gap:8px;align-items:center;flex:none}
+.acc-on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600}
+.modal{position:fixed;inset:0;background:rgba(20,18,16,.5);display:none;align-items:center;justify-content:center;z-index:99;padding:20px}
+.modal.show{display:flex}
+.modal-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;width:100%;max-width:370px;box-shadow:var(--shadow)}
+.modal-card h3{margin:0 0 6px;font-size:17px;letter-spacing:.3px}
+.modal-card .msub{margin:0 0 16px;font-size:12.5px;color:var(--sub);line-height:1.6}
+.modal-card input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:13.5px;font-family:inherit;background:var(--bg);color:var(--ink);outline:none;margin-bottom:10px}
+.modal-card input:focus{border-color:var(--accent)}
+.modal-actions{display:flex;gap:8px;margin-top:6px}
+.modal-actions button{flex:1;padding:10px;border-radius:9px;font-size:13.5px;cursor:pointer;font-family:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);transition:.15s}
+.modal-actions .primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.modal-actions button:disabled{opacity:.6;cursor:not-allowed}
+.modal-msg{font-size:12.5px;margin-top:12px;min-height:16px;line-height:1.5;color:var(--err)}
+.modal-msg.ok{color:var(--ok)}
+.switch-line{margin-top:12px;font-size:12.5px;color:var(--sub);text-align:center}
+.switch-line a{color:var(--accent);cursor:pointer;text-decoration:none}
+.acc-info{margin:2px 0 14px;font-size:13px;line-height:1.7;color:var(--ink)}
+.acc-info span{display:block;font-size:12px;color:var(--sub);margin-top:2px}
+.sync-state{font-size:11.5px;color:var(--sub);text-align:center;margin-top:10px}
 
 .tabs{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:18px;box-shadow:var(--shadow)}
 .tab{
@@ -221,7 +241,10 @@ footer a{color:var(--sub)}
       <h1>毛概刷题</h1>
       <p>2023 版《概论》知识点与练习题 · 共 <span id="totalCount">—</span> 题</p>
     </div>
-    <button class="themebtn" id="themeBtn">夜间模式</button>
+    <div class="head-actions">
+      <button class="themebtn" id="accBtn">登录同步</button>
+      <button class="themebtn" id="themeBtn">夜间模式</button>
+    </div>
   </header>
 
   <div class="tabs">
@@ -279,6 +302,32 @@ footer a{color:var(--sub)}
   </footer>
 </div>
 
+<div class="modal" id="accModal">
+  <div class="modal-card">
+    <h3 id="accTitle">登录以同步进度</h3>
+    <p class="msub" id="accSub">登录后，手机和电脑共用同一份答题进度与错题本</p>
+    <div id="accForm">
+      <input type="email" id="accEmail" placeholder="邮箱" autocomplete="username">
+      <input type="password" id="accPwd" placeholder="密码（至少 6 位）" autocomplete="current-password">
+      <div class="modal-actions">
+        <button id="accClose">取消</button>
+        <button class="primary" id="accSubmit">登录</button>
+      </div>
+      <div class="switch-line" id="accSwitch">没有账号？<a id="accToggle">注册一个</a></div>
+    </div>
+    <div id="accProfile" style="display:none">
+      <div class="acc-info"><b id="accMail">—</b><span id="accSync">已同步</span></div>
+      <div class="modal-actions">
+        <button id="accClose2">关闭</button>
+        <button id="accLogout">退出登录</button>
+      </div>
+    </div>
+    <div class="modal-msg" id="accMsg"></div>
+    <div class="sync-state" id="accHint">未登录时进度只保存在本机浏览器</div>
+  </div>
+</div>
+
+<script src="supabase.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -328,6 +377,278 @@ footer a{color:var(--sub)}
     themeBtn: document.getElementById("themeBtn")
   };
 
+  /* ================= 云端同步（Supabase） ================= */
+  var SB_URL = "https://cegvxzdfzgdybrcxdvcp.supabase.co";
+  var SB_KEY = "sb_publishable_zjmcaxE9kvZcGJNPg3aQFA_NVryt9TB";
+  var SB_TABLE = "quiz_progress";
+
+  var sb = null;
+  var sbUser = null;
+  var syncTimer = null;
+  var syncBusy = false;
+  var authMode = "signin";
+
+  function initSupabase(){
+    if (typeof window.supabase === "undefined" || !window.supabase.createClient) return null;
+    try {
+      return window.supabase.createClient(SB_URL, SB_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+      });
+    } catch(e){ return null; }
+  }
+
+  function uiMsg(text, ok){
+    var m = document.getElementById("accMsg");
+    if (!m) return;
+    m.textContent = text || "";
+    m.className = "modal-msg" + (ok ? " ok" : "");
+  }
+
+  function setSyncText(t){
+    var s = document.getElementById("accSync");
+    if (s) s.textContent = t;
+    var h = document.getElementById("accHint");
+    if (h) h.textContent = sbUser ? "云端已保存，换设备登录即可接着答" : "未登录时进度只保存在本机浏览器";
+  }
+
+  function refreshAccBtn(){
+    var b = document.getElementById("accBtn");
+    if (!b) return;
+    if (sbUser){
+      b.textContent = (sbUser.email || "已登录").split("@")[0] + " · 已同步";
+      b.classList.add("acc-on");
+    } else {
+      b.textContent = "登录同步";
+      b.classList.remove("acc-on");
+    }
+  }
+
+  function collectLocal(){
+    var s = null;
+    try { s = JSON.parse(localStorage.getItem(LS_SESSION) || "null"); } catch(e){}
+    return { v: 2, wrong: Array.from(wrongSet), session: s, ts: Date.now() };
+  }
+
+  function saveWrongLocal(){
+    try { localStorage.setItem(LS_WRONG, JSON.stringify(Array.from(wrongSet))); } catch(e){}
+  }
+
+  function pushNow(){
+    if (!sb || !sbUser || syncBusy) return;
+    syncBusy = true;
+    var payload = collectLocal();
+    sb.from(SB_TABLE).upsert(
+      { user_id: sbUser.id, data: payload, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    ).then(function(res){
+      syncBusy = false;
+      setSyncText(res && res.error ? "同步失败，稍后重试" : "已同步");
+    }).catch(function(){
+      syncBusy = false;
+      setSyncText("同步失败，稍后重试");
+    });
+  }
+
+  function schedulePush(){
+    if (!sb || !sbUser) return;
+    setSyncText("同步中…");
+    if (syncTimer) return;
+    syncTimer = setTimeout(function(){ syncTimer = null; pushNow(); }, 1000);
+  }
+
+  function resetAndRestore(){
+    state.queue = []; state.idx = 0; state.answered = 0; state.correct = 0;
+    state.log = {}; state.selected = []; state.locked = false; state.revealed = false;
+    state.resumed = true;
+    restoreSession();
+  }
+
+  function applyCloud(cloud){
+    if (!cloud){ pushNow(); return; }
+    var changed = false;
+    var cw = Array.isArray(cloud.wrong) ? cloud.wrong : [];
+    cw.forEach(function(id){ if (!wrongSet.has(id)){ wrongSet.add(id); changed = true; } });
+    if (changed) saveWrongLocal();
+
+    var localS = null, cloudS = cloud.session || null;
+    try { localS = JSON.parse(localStorage.getItem(LS_SESSION) || "null"); } catch(e){}
+    var pick = null;
+    if (!localS) pick = cloudS;
+    else if (!cloudS) pick = localS;
+    else {
+      var la = parseInt(localS.answered, 10) || 0, ca = parseInt(cloudS.answered, 10) || 0;
+      if (ca > la) pick = cloudS;
+      else if (ca === la && (parseInt(cloudS.idx, 10) || 0) > (parseInt(localS.idx, 10) || 0)) pick = cloudS;
+      else pick = localS;
+    }
+    if (pick && pick !== localS){
+      try { localStorage.setItem(LS_SESSION, JSON.stringify(pick)); } catch(e){}
+      resetAndRestore();
+    }
+    if (typeof updateStats === "function") updateStats();
+    schedulePush();
+  }
+
+  function fetchCloud(cb){
+    if (!sb || !sbUser){ cb(null); return; }
+    sb.from(SB_TABLE).select("data").eq("user_id", sbUser.id).maybeSingle()
+      .then(function(res){
+        if (res && res.error){ uiMsg("读取云端进度失败：" + res.error.message); cb(null); return; }
+        cb(res && res.data ? res.data.data : null);
+      }).catch(function(){ cb(null); });
+  }
+
+  function errText(msg){
+    var m = msg || "";
+    if (/Invalid login credentials/i.test(m)) return "邮箱或密码不正确";
+    if (/already registered/i.test(m)) return "该邮箱已注册，请直接登录";
+    if (/at least 6 characters/i.test(m)) return "密码至少需要 6 位";
+    if (/Email not confirmed/i.test(m)) return "邮箱还没验证：到 Supabase 关闭 Confirm email 后再试";
+    if (/Invalid email/i.test(m)) return "邮箱格式不对";
+    if (/rate limit/i.test(m)) return "尝试太频繁，等几分钟再试";
+    return m;
+  }
+
+  function showForm(){
+    var f = document.getElementById("accForm"), p = document.getElementById("accProfile");
+    if (f) f.style.display = "block";
+    if (p) p.style.display = "none";
+  }
+
+  function showProfile(){
+    var f = document.getElementById("accForm"), p = document.getElementById("accProfile");
+    if (f) f.style.display = "none";
+    if (p) p.style.display = "block";
+    var mail = document.getElementById("accMail");
+    if (mail) mail.textContent = sbUser ? sbUser.email : "—";
+    setSyncText("正在同步…");
+  }
+
+  function afterLogin(user){
+    sbUser = user;
+    refreshAccBtn();
+    showProfile();
+    fetchCloud(function(cloud){ applyCloud(cloud); });
+  }
+
+  function doAuth(){
+    if (!sb){ uiMsg("同步服务没加载上，刷新页面再试"); return; }
+    var email = (document.getElementById("accEmail").value || "").trim();
+    var pwd = document.getElementById("accPwd").value || "";
+    if (!email || !pwd){ uiMsg("邮箱和密码都要填"); return; }
+    var btn = document.getElementById("accSubmit");
+    btn.disabled = true;
+    uiMsg(authMode === "signup" ? "正在注册…" : "正在登录…", true);
+    var req = authMode === "signup"
+      ? sb.auth.signUp({ email: email, password: pwd })
+      : sb.auth.signInWithPassword({ email: email, password: pwd });
+    req.then(function(res){
+      btn.disabled = false;
+      if (res && res.error){ uiMsg(errText(res.error.message)); return; }
+      var user = res && res.data && (res.data.user || (res.data.session && res.data.session.user));
+      if (authMode === "signup" && !(res.data && res.data.session)){
+        uiMsg("注册成功，但邮箱验证还开着：请到 Supabase 关闭 Confirm email 后再登录", true);
+        authMode = "signin";
+        syncAuthLabels();
+        return;
+      }
+      uiMsg("");
+      if (user) afterLogin(user);
+    }).catch(function(e){
+      btn.disabled = false;
+      uiMsg("网络异常：" + (e && e.message ? e.message : "请重试"));
+    });
+  }
+
+  function syncAuthLabels(){
+    var t = document.getElementById("accTitle");
+    var s = document.getElementById("accSub");
+    var b = document.getElementById("accSubmit");
+    var sw = document.getElementById("accSwitch");
+    if (authMode === "signup"){
+      if (t) t.textContent = "注册账号";
+      if (s) s.textContent = "注册后答题进度会存到云端，换设备登录即可继续";
+      if (b) b.textContent = "注册";
+    } else {
+      if (t) t.textContent = "登录以同步进度";
+      if (s) s.textContent = "登录后，手机和电脑共用同一份答题进度与错题本";
+      if (b) b.textContent = "登录";
+    }
+    if (sw) sw.innerHTML = authMode === "signup"
+      ? '已有账号？<a id="accToggle">直接登录</a>'
+      : '没有账号？<a id="accToggle">注册一个</a>';
+    var tg = document.getElementById("accToggle");
+    if (tg) tg.addEventListener("click", function(){
+      authMode = authMode === "signup" ? "signin" : "signup";
+      uiMsg("");
+      syncAuthLabels();
+    });
+  }
+
+  function openModal(){
+    var m = document.getElementById("accModal");
+    if (!m) return;
+    m.classList.add("show");
+    uiMsg("");
+    if (sbUser) showProfile(); else showForm();
+  }
+
+  function closeModal(){
+    var m = document.getElementById("accModal");
+    if (m) m.classList.remove("show");
+  }
+
+  sb = initSupabase();
+  if (sb){
+    sb.auth.getSession().then(function(res){
+      var s = res && res.data && res.data.session;
+      if (s && s.user){
+        sbUser = s.user;
+        refreshAccBtn();
+        fetchCloud(function(cloud){ applyCloud(cloud); });
+      }
+    }).catch(function(){});
+    sb.auth.onAuthStateChange(function(evt, session){
+      if (session && session.user){
+        var need = !sbUser || sbUser.id !== session.user.id;
+        sbUser = session.user;
+        refreshAccBtn();
+        if (need) fetchCloud(function(cloud){ applyCloud(cloud); });
+      }
+    });
+  } else {
+    var accB = document.getElementById("accBtn");
+    if (accB){ accB.textContent = "同步不可用"; accB.title = "supabase.min.js 未加载"; }
+  }
+
+  (function bindAccountUI(){
+    var btn = document.getElementById("accBtn");
+    if (btn) btn.addEventListener("click", openModal);
+    var c1 = document.getElementById("accClose");
+    if (c1) c1.addEventListener("click", closeModal);
+    var c2 = document.getElementById("accClose2");
+    if (c2) c2.addEventListener("click", closeModal);
+    var sub = document.getElementById("accSubmit");
+    if (sub) sub.addEventListener("click", doAuth);
+    var pwd = document.getElementById("accPwd");
+    if (pwd) pwd.addEventListener("keydown", function(e){ if (e.key === "Enter") doAuth(); });
+    var em = document.getElementById("accEmail");
+    if (em) em.addEventListener("keydown", function(e){ if (e.key === "Enter") document.getElementById("accPwd").focus(); });
+    var out = document.getElementById("accLogout");
+    if (out) out.addEventListener("click", function(){
+      if (!sb) return;
+      sb.auth.signOut().then(function(){
+        sbUser = null;
+        refreshAccBtn();
+        uiMsg("已退出登录，本机记录仍保留", true);
+        showForm();
+      });
+    });
+    var modal = document.getElementById("accModal");
+    if (modal) modal.addEventListener("click", function(e){ if (e.target === modal) closeModal(); });
+    syncAuthLabels();
+  })();
+
   /* ---------- 主题 ---------- */
   function applyTheme(t){
     document.documentElement.setAttribute("data-theme", t);
@@ -368,6 +689,7 @@ footer a{color:var(--sub)}
 
   function saveWrong(){
     try { localStorage.setItem(LS_WRONG, JSON.stringify(Array.from(wrongSet))); } catch(e){}
+    if (typeof schedulePush === "function") schedulePush();
   }
 
   function normalize(a){
@@ -390,6 +712,7 @@ footer a{color:var(--sub)}
           done: !!(state.queue.length && state.idx >= state.queue.length)
         }));
       } catch(e){}
+      if (typeof schedulePush === "function") schedulePush();
     };
     if (immediate){ if (saveTimer){ clearTimeout(saveTimer); saveTimer = null; } write(); return; }
     if (saveTimer) return;
