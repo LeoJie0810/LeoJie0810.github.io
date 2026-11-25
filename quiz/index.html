@@ -127,7 +127,7 @@ select:focus{border-color:var(--accent)}
   background:var(--card);border:1px solid var(--line);border-radius:18px;margin-top:18px;
   padding:26px 26px 22px;box-shadow:var(--shadow);animation:fade .22s ease;
 }
-@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:.72;transform:translateY(5px)}to{opacity:1;transform:none}}
 
 .qmeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
 .badge{font-size:11.5px;padding:4px 9px;border-radius:6px;letter-spacing:.3px}
@@ -355,7 +355,8 @@ footer a{color:var(--sub)}
     locked: false,
     revealed: false,
     log: {},
-    resumed: false
+    resumed: false,
+    filter: null
   };
 
   var el = {
@@ -386,6 +387,7 @@ footer a{color:var(--sub)}
   var sbUser = null;
   var syncTimer = null;
   var syncBusy = false;
+  var authPending = false;
   var authMode = "signin";
 
   function initSupabase(){
@@ -459,7 +461,7 @@ footer a{color:var(--sub)}
   function resetAndRestore(){
     state.queue = []; state.idx = 0; state.answered = 0; state.correct = 0;
     state.log = {}; state.selected = []; state.locked = false; state.revealed = false;
-    state.resumed = true;
+    state.resumed = true; state.filter = null;
     restoreSession();
   }
 
@@ -598,22 +600,43 @@ footer a{color:var(--sub)}
     if (m) m.classList.remove("show");
   }
 
+  function ensureStarted(){
+    if (!CHAPTERS.length) return;
+    if (state.queue && state.queue.length) return;
+    start();
+  }
+
   sb = initSupabase();
   if (sb){
+    authPending = true;
     sb.auth.getSession().then(function(res){
       var s = res && res.data && res.data.session;
+      authPending = false;
       if (s && s.user){
         sbUser = s.user;
         refreshAccBtn();
-        fetchCloud(function(cloud){ applyCloud(cloud); });
+        fetchCloud(function(cloud){
+          applyCloud(cloud);
+          ensureStarted();
+        });
+      } else {
+        ensureStarted();
       }
-    }).catch(function(){});
+    }).catch(function(){
+      authPending = false;
+      ensureStarted();
+    });
     sb.auth.onAuthStateChange(function(evt, session){
       if (session && session.user){
         var need = !sbUser || sbUser.id !== session.user.id;
         sbUser = session.user;
         refreshAccBtn();
-        if (need) fetchCloud(function(cloud){ applyCloud(cloud); });
+        if (need){
+          fetchCloud(function(cloud){
+            applyCloud(cloud);
+            ensureStarted();
+          });
+        }
       }
     });
   } else {
@@ -709,6 +732,7 @@ footer a{color:var(--sub)}
           answered: state.answered,
           correct: state.correct,
           log: state.log,
+          filter: state.filter || null,
           done: !!(state.queue.length && state.idx >= state.queue.length)
         }));
       } catch(e){}
@@ -747,6 +771,8 @@ footer a{color:var(--sub)}
     state.correct = parseInt(s.correct, 10) || 0;
     state.log = (s.log && typeof s.log === "object") ? s.log : {};
     state.resumed = true;
+    state.filter = (s.filter && typeof s.filter === "object") ? s.filter : null;
+    applyFilterNow(state.filter);
 
     renderQuestion();
     updateStats();
@@ -793,13 +819,48 @@ footer a{color:var(--sub)}
     if (el.typeChk) el.typeChk.addEventListener("change", syncTypeChk);
     syncTypeChk();
 
-    if (!restoreSession()) start();
+    if (pendingFilter) applyFilterNow(pendingFilter);
+    if (!restoreSession()){
+      if (!authPending){
+        start();
+      } else {
+        setTimeout(function(){ if (!state.queue.length) start(); }, 4500);
+      }
+    }
   }
 
   function selectedTypes(){
     if (!el.typeChk) return ["single", "multiple", "short"];
     return Array.prototype.slice.call(el.typeChk.querySelectorAll("input:checked"))
       .map(function(i){ return i.value; });
+  }
+
+  /* ---------- 筛选条件（章节 / 题型 / 顺序） ---------- */
+  var pendingFilter = null;
+
+  function currentFilter(){
+    return {
+      ch: el.chSel ? el.chSel.value : "all",
+      types: selectedTypes(),
+      order: el.orderSel ? el.orderSel.value : "random"
+    };
+  }
+
+  function applyFilterNow(f){
+    if (!f) return;
+    pendingFilter = f;
+    if (el.orderSel && f.order) el.orderSel.value = f.order;
+    if (el.chSel && el.chSel.options && el.chSel.options.length && f.ch){
+      for (var i = 0; i < el.chSel.options.length; i++){
+        if (el.chSel.options[i].value === f.ch){ el.chSel.value = f.ch; break; }
+      }
+    }
+    if (el.typeChk && Array.isArray(f.types) && f.types.length){
+      Array.prototype.forEach.call(el.typeChk.querySelectorAll("input"), function(inp){
+        inp.checked = f.types.indexOf(inp.value) >= 0;
+      });
+      syncTypeChk();
+    }
   }
 
   function syncTypeChk(){
@@ -866,6 +927,8 @@ footer a{color:var(--sub)}
     var chVal = el.chSel.value;
     var types = selectedTypes();
     var order = el.orderSel.value;
+
+    state.filter = { ch: chVal, types: types, order: order };
 
     if (!types.length){
       el.qArea.innerHTML = '<div class="empty">请至少勾选一种题型再开始</div>';
@@ -1020,6 +1083,16 @@ footer a{color:var(--sub)}
     document.getElementById("navNextBtn").addEventListener("click", next);
 
     if (rec) renderFeedback(q, rec);
+
+    var cardEl = el.qArea.querySelector(".qcard");
+    if (cardEl){
+      cardEl.style.animation = "";
+      setTimeout(function(){
+        cardEl.style.animation = "none";
+        cardEl.style.opacity = "";
+        cardEl.style.transform = "";
+      }, 320);
+    }
 
     updateNav();
     updateStats();
