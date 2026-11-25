@@ -771,7 +771,7 @@ footer a{color:var(--sub)}
     state.correct = parseInt(s.correct, 10) || 0;
     state.log = (s.log && typeof s.log === "object") ? s.log : {};
     state.resumed = true;
-    state.filter = (s.filter && typeof s.filter === "object") ? s.filter : null;
+    state.filter = (s.filter && typeof s.filter === "object") ? s.filter : inferFilter(queue);
     applyFilterNow(state.filter);
 
     renderQuestion();
@@ -861,6 +861,30 @@ footer a{color:var(--sub)}
       });
       syncTypeChk();
     }
+  }
+
+  /* 旧版进度没存筛选条件时，按队列反推章节 / 题型 / 顺序 */
+  function inferFilter(queue){
+    var chs = {}, types = {}, i;
+    for (i = 0; i < queue.length; i++){
+      chs[queue[i].chapter] = 1;
+      types[queue[i].type] = 1;
+    }
+    var chList = Object.keys(chs);
+    var tList = Object.keys(types);
+    var seq = true, lastCh = -1, lastNo = -1;
+    for (i = 0; i < queue.length; i++){
+      var ci = 0;
+      for (var k = 0; k < CHAPTERS.length; k++){ if (CHAPTERS[k].id === queue[i].chapter){ ci = k; break; } }
+      var no = parseInt(queue[i].local_no, 10) || 0;
+      if (i > 0 && (ci < lastCh || (ci === lastCh && no < lastNo))){ seq = false; break; }
+      lastCh = ci; lastNo = no;
+    }
+    return {
+      ch: chList.length === 1 ? chList[0] : "all",
+      types: tList.length ? tList : ["single", "multiple", "short"],
+      order: seq ? "seq" : "random"
+    };
   }
 
   function syncTypeChk(){
