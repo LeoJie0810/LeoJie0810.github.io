@@ -872,19 +872,33 @@ footer a{color:var(--sub)}
     }
     var chList = Object.keys(chs);
     var tList = Object.keys(types);
-    var seq = true, lastCh = -1, lastNo = -1;
-    for (i = 0; i < queue.length; i++){
-      var ci = 0;
-      for (var k = 0; k < CHAPTERS.length; k++){ if (CHAPTERS[k].id === queue[i].chapter){ ci = k; break; } }
-      var no = parseInt(queue[i].local_no, 10) || 0;
-      if (i > 0 && (ci < lastCh || (ci === lastCh && no < lastNo))){ seq = false; break; }
-      lastCh = ci; lastNo = no;
-    }
-    return {
+    var f = {
       ch: chList.length === 1 ? chList[0] : "all",
       types: tList.length ? tList : ["single", "multiple", "short"],
-      order: seq ? "seq" : "random"
+      order: "random"
     };
+    /* 顺序判定：只有当队列与"按章节顺序"生成的完整题池逐题一致时才算顺序模式 */
+    var pool = [];
+    var all = allQuestions();
+    if (f.ch === "__wrong__"){
+      all.forEach(function(q){ if (wrongSet.has(q.id)) pool.push(q); });
+    } else if (f.ch === "all"){
+      pool = all.slice();
+    } else {
+      var ch = findChapter(f.ch);
+      pool = ch ? ch.questions.slice() : all.slice();
+    }
+    if (f.types.length < 3){
+      pool = pool.filter(function(q){ return f.types.indexOf(q.type) >= 0; });
+    }
+    var sameSeq = pool.length === queue.length && pool.length > 0;
+    if (sameSeq){
+      for (i = 0; i < pool.length; i++){
+        if (pool[i].id !== queue[i].id){ sameSeq = false; break; }
+      }
+    }
+    f.order = sameSeq ? "seq" : "random";
+    return f;
   }
 
   function syncTypeChk(){
